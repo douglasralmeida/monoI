@@ -1,22 +1,19 @@
+BMV2_SWITCH_EXE = simple_switch_grpc
+TOPO = topo/topology.json
+
 BUILD_DIR = build
 PCAP_DIR = pcaps
 LOG_DIR = logs
 
 P4C = p4c-bm2-ss
-P4C_ARGS += --p4runtime-files $(BUILD_DIR)/$(basename $@).p4.p4info.txt
+# P4C_ARGS += --p4runtime-files $(BUILD_DIR)/$(basename $@).p4.p4info.txt
 
-RUN_SCRIPT = ../../utils/run_exercise.py
-
-ifndef TOPO
-TOPO = topology.json
-endif
+RUN_SCRIPT = utils/run_exercise.py
 
 source = $(wildcard *.p4)
 compiled_json := $(source:.p4=.json)
 
-ifndef DEFAULT_PROG
 DEFAULT_PROG = $(wildcard *.p4)
-endif
 DEFAULT_JSON = $(BUILD_DIR)/$(DEFAULT_PROG:.p4=.json)
 
 # Define NO_P4 to start BMv2 without a program
