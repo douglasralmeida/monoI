@@ -70,25 +70,80 @@ struct headers {
 *************************** P A R S E R **********************************
 *************************************************************************/
 
+parser DnsParser(packet_in packet,
+                out headers hdr,
+                inout metadata meta,
+                inout standard_metadata_t standard_metadata) {
+
+    state start {
+        /* TODO: add parser logic */
+        transition accept;
+    }
+}
+
 /*************************************************************************
 ************** C H E C K S U M     V E R I F I C A T I O N ***************
 *************************************************************************/
+
+control DnsVerifyChecksum(inout headers hdr, inout metadata meta) {   
+    apply {
+
+    }
+}
 
 /*************************************************************************
 ****************** I N G R E S S    P R O C E S S I N G ******************
 *************************************************************************/
 
+control DnsIngress(inout headers hdr,
+                  inout metadata meta,
+                  inout standard_metadata_t standard_metadata) {
+    action drop() {
+        mark_to_drop(standard_metadata);
+    }
+    
+    action ipv4_forward(macAddr_t dstAddr, egressSpec_t port) {
+        /* TODO: fill out code in action body */
+    }
+        
+    apply {
+        /* TODO: fix ingress control logic
+         *  - ipv4_lpm should be applied only when IPv4 header is valid
+         */
+    }
+}
+
 /*************************************************************************
 ******************* E G R E S S     P R O C E S S I N G ******************
 *************************************************************************/
+
+control DnsEgress(inout headers hdr,
+                 inout metadata meta,
+                 inout standard_metadata_t standard_metadata) {
+    apply {
+
+    }
+}
 
 /*************************************************************************
 *************** C H E C K S U M     C O M P U T A T I O N ****************
 *************************************************************************/
 
+control DnsComputeChecksum(inout headers hdr, inout metadata meta) {
+    apply {
+
+    }
+}
+
 /*************************************************************************
 ************************** D E P A R S E R *******************************
 *************************************************************************/
+
+control DnsDeparser(packet_out packet, in headers hdr) {
+    apply {
+        /* TODO: add deparser logic */
+    }
+}
 
 /*************************************************************************
 *************************** S W I T C H **********************************
