@@ -36,7 +36,7 @@ header udp_t {
     bit<16> sport;
     bit<16> dport;
     bit<16> len;
-    bit<16> checksum; 
+    bit<16> checksum;
 }
 
 header dns_t {
@@ -85,7 +85,7 @@ parser DnsParser(packet_in packet,
 ************** C H E C K S U M     V E R I F I C A T I O N ***************
 *************************************************************************/
 
-control DnsVerifyChecksum(inout headers hdr, inout metadata meta) {   
+control DnsVerifyChecksum(inout headers hdr, inout metadata meta) {
     apply {
 
     }
@@ -101,11 +101,11 @@ control DnsIngress(inout headers hdr,
     action drop() {
         mark_to_drop(standard_metadata);
     }
-    
-    action ipv4_forward(macAddr_t dstAddr, egressSpec_t port) {
+
+    action ipv4_forward(macAddr_t dstAddr) {
         /* TODO: fill out code in action body */
     }
-        
+
     apply {
         /* TODO: fix ingress control logic
          *  - ipv4_lpm should be applied only when IPv4 header is valid
