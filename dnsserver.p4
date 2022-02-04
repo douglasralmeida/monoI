@@ -3,6 +3,7 @@
 #include <v1model.p4>
 
 const bit<16> TYPE_IPV4 = 0x800;
+const bit<8> TYPE_UDP = 17;
 
 /*************************************************************************
 ************************** H E A D E R S *********************************
@@ -33,9 +34,9 @@ header ipv4_t {
 }
 
 header udp_t {
-    bit<16> sport;
-    bit<16> dport;
-    bit<16> len;
+    bit<16> srcPort;
+    bit<16> dstPort;
+    bit<16> length;
     bit<16> checksum;
 }
 
@@ -47,14 +48,12 @@ header dns_t {
     bit<1> trunc;
     bit<1> recurDesired;
     bit<1> recurAvail;
-    bit<1> reserved;
-    bit<1> authenticData;
-    bit<1> checkingDisabled;
+    bit<3> reserved;
     bit<4> respCode;
-    bit<16> qCount;
-    bit<16> answerCount;
-    bit<16> authRec;
-    bit<16> addrRec;
+    bit<16> qdCount;
+    bit<16> anCount;
+    bit<16> nsCount;
+    bit<16> arCount;
 }
 
 struct metadata {
@@ -64,6 +63,8 @@ struct metadata {
 struct headers {
     ethernet_t   ethernet;
     ipv4_t       ipv4;
+    udp_t        udp;
+    dns_t        dns;
 }
 
 /*************************************************************************
@@ -75,8 +76,49 @@ parser DnsParser(packet_in packet,
                 inout metadata meta,
                 inout standard_metadata_t standard_metadata) {
 
+    /* start parsing */
     state start {
-        /* TODO: add parser logic */
+        /* parse ethernet packet */
+        transition parse_ethernet;
+    }
+
+    /* start parsing ethernet packet */
+    state parse_ethernet {
+        /* extract ethernet packet from input packet */
+        packet.extract(hdr.ethernet);
+        transition select(hdr.ethernet.etherType) {
+            /* parse IP packet */
+            TYPE_IPV4: parse_ipv4;
+            default: accept;
+       }
+    }
+
+    /* start parsing IP packet */
+    state parse_ipv4 {
+        /* extract IP packet from ethernet packet */
+        packet.extract(hdr.ipv4);
+        transition select(hdr.ipv4.protocol) {
+            /* parse UDP packet */
+            TYPE_UDP: parse_udp;
+            default: accept;
+        }
+    }
+
+    /* start parsing UDP packet */
+    state parse_udp {
+        /* extract DNS packet from UDP packet */
+        packet.extract(hdr.udp)
+        transition select(hdr.udp.dstPort == 53) {
+            /* parse DNS packet */
+            true: parse_dns;
+            false: accept;
+        }
+    }
+
+    /* start parsing DNS packet */
+    state parse_dns {
+        /* extract DNS data in DNS packet */
+        packet.extract(hdr.dns);
         transition accept;
     }
 }
@@ -141,7 +183,10 @@ control DnsComputeChecksum(inout headers hdr, inout metadata meta) {
 
 control DnsDeparser(packet_out packet, in headers hdr) {
     apply {
-        /* TODO: add deparser logic */
+        packet.emit(hdr.ethernet);
+        packet.emit(hdr.ipv4);
+        packet.emit(hdr.udp);
+        packet.emit(hdr.dns);
     }
 }
 
