@@ -1,34 +1,60 @@
 {
     "target": "bmv2",
-    "p4info": "build/basic.p4.p4info.txt",
-    "bmv2_json": "build/basic.json",
+    "p4info": "build/dnsserver.p4.p4info.txt",
+    "bmv2_json": "build/dnsserver.json",
     "table_entries": [
       {
-        "table": "MyIngress.ipv4_lpm",
+        "table": "DnsIngress.ipv4_lpm",
         "default_action": true,
-        "action_name": "MyIngress.drop",
+        "action_name": "DnsIngress.drop",
         "action_params": { }
       },
       {
-        "table": "MyIngress.ipv4_lpm",
+        "table": "DnsIngress.ipv4_lpm",
         "match": {
           "hdr.ipv4.dstAddr": ["10.0.1.1", 32]
         },
-        "action_name": "MyIngress.ipv4_forward",
+        "action_name": "DnsIngress.ipv4_forward",
         "action_params": {
           "dstAddr": "08:00:00:00:01:11",
           "port": 1
         }
       },
       {
-        "table": "MyIngress.ipv4_lpm",
+        "table": "DnsIngress.ipv4_lpm",
         "match": {
           "hdr.ipv4.dstAddr": ["10.0.2.2", 32]
         },
-        "action_name": "MyIngress.ipv4_forward",
+        "action_name": "DnsIngress.ipv4_forward",
         "action_params": {
           "dstAddr": "08:00:00:00:02:22",
           "port": 2
+        }
+      },
+      {
+        "table": "DnsIngress.dns_table",
+        "default_action": true,
+        "action_name": "DnsIngress.dns_miss",
+        "action_params": { }
+      },
+      {
+        "table": "DnsIngress.dns_table",
+        "match": {
+          "hdr.dns_query.name": 7165919125647749743
+        },
+        "action_name": "DnsIngress.dns_found",
+        "action_params": {
+          "answer": "10.0.2.2"
+        }
+      },
+      {
+        "table": "DnsIngress.dns_table",
+        "match": {
+          "hdr.dns_query.name": 7093015899811047279
+        },
+        "action_name": "DnsIngress.dns_found",
+        "action_params": {
+          "answer": "10.0.3.3"
         }
       }
     ]

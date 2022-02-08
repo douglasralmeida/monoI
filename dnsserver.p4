@@ -5,10 +5,21 @@
 const bit<16> TYPE_IPV4 = 0x800;
 const bit<8> TYPE_UDP = 17;
 
+const bit<16> DNS_CLASS_INTERNET = 1;
+
+const bit<4> DNS_RESP_NOERROR = 0;
+const bit<4> DNS_RESP_NAMEERROR = 3;
+
+const bit<1> DNS_TYPE_QUERY = 0;
+const bit<1> DNS_TYPE_RESPONSE = 1;
+
+const bit<16> DNS_RR_ADDRESS = 1;
+
 /*************************************************************************
 ************************** H E A D E R S *********************************
 *************************************************************************/
-
+typedef bit<9>  port_t;
+typedef bit<64>  string_t;
 typedef bit<48> macAddr_t;
 typedef bit<32> ip4Addr_t;
 
@@ -36,35 +47,57 @@ header ipv4_t {
 header udp_t {
     bit<16> srcPort;
     bit<16> dstPort;
-    bit<16> length;
+    bit<16> totalLen;
     bit<16> checksum;
 }
 
 header dns_t {
     bit<16> id;
-    bit<1> isResponse;
-    bit<4> opCode;
-    bit<1> authAnswer;
-    bit<1> trunc;
-    bit<1> recurDesired;
-    bit<1> recurAvail;
-    bit<3> reserved;
-    bit<4> respCode;
+    bit<1>  qr;
+    bit<4>  opCode;
+    bit<1>  authAnswer;
+    bit<1>  trunc;
+    bit<1>  recurDesired;
+    bit<1>  recurAvail;
+    bit<3>  reserved;
+    bit<4>  respCode;
     bit<16> qdCount;
     bit<16> anCount;
     bit<16> nsCount;
     bit<16> arCount;
 }
 
-struct metadata {
-    /* empty */
+/* Use fixed size for query name until P4 to support */
+/* operations for varbit type                        */
+/* Query name must have exactly 8 letters            */
+header dnsquery_t {
+    bit<8> totalLen;
+    string_t name;
+    bit<16> type;
+    bit<16> class;
+}
+
+header dnsanswer_t {
+    string_t  name;
+    bit<16>   type;
+    bit<16>   class;
+    bit<16>   ttl;
+    bit<16>   rdLength;
+    ip4Addr_t rdData;
+}
+
+struct metadata_t {
+    bit<1> is_dns;
+    bit<1> is_query;
 }
 
 struct headers {
-    ethernet_t   ethernet;
-    ipv4_t       ipv4;
-    udp_t        udp;
-    dns_t        dns;
+    ethernet_t     ethernet;
+    ipv4_t         ipv4;
+    udp_t          udp;
+    dns_t          dns;
+    dnsquery_t     dns_query;
+    dnsanswer_t    dns_anwser;
 }
 
 /*************************************************************************
@@ -73,11 +106,14 @@ struct headers {
 
 parser DnsParser(packet_in packet,
                 out headers hdr,
-                inout metadata meta,
+                inout metadata_t meta,
                 inout standard_metadata_t standard_metadata) {
 
     /* start parsing */
     state start {
+        meta.is_dns = 0;
+        meta.is_query = 0;
+
         /* parse ethernet packet */
         transition parse_ethernet;
     }
@@ -107,7 +143,7 @@ parser DnsParser(packet_in packet,
     /* start parsing UDP packet */
     state parse_udp {
         /* extract DNS packet from UDP packet */
-        packet.extract(hdr.udp)
+        packet.extract(hdr.udp);
         transition select(hdr.udp.dstPort == 53) {
             /* parse DNS packet */
             true: parse_dns;
@@ -119,6 +155,26 @@ parser DnsParser(packet_in packet,
     state parse_dns {
         /* extract DNS data in DNS packet */
         packet.extract(hdr.dns);
+        meta.is_dns = 1;
+        transition select(hdr.dns.qr) {
+            DNS_TYPE_QUERY: parse_dnsquery;
+            DNS_TYPE_RESPONSE: parse_dnsanswer;
+            default: accept;
+        }
+    }
+
+    /* start parsing DNS query */
+    state parse_dnsquery {
+        /* extract DNS query in DNS packet */
+        packet.extract(hdr.dns_query);
+        meta.is_query = 1;
+        transition accept;
+    }
+
+    /* start parsing DNS answer */
+    state parse_dnsanswer {
+        /* extract DNS answer in DNS packet */
+        packet.extract(hdr.dns_anwser);
         transition accept;
     }
 }
@@ -127,7 +183,7 @@ parser DnsParser(packet_in packet,
 ************** C H E C K S U M     V E R I F I C A T I O N ***************
 *************************************************************************/
 
-control DnsVerifyChecksum(inout headers hdr, inout metadata meta) {
+control DnsVerifyChecksum(inout headers hdr, inout metadata_t meta) {
     apply {
 
     }
@@ -138,20 +194,90 @@ control DnsVerifyChecksum(inout headers hdr, inout metadata meta) {
 *************************************************************************/
 
 control DnsIngress(inout headers hdr,
-                  inout metadata meta,
+                  inout metadata_t meta,
                   inout standard_metadata_t standard_metadata) {
     action drop() {
         mark_to_drop(standard_metadata);
     }
 
-    action ipv4_forward(macAddr_t dstAddr) {
-        /* TODO: fill out code in action body */
+    action dns_found(ip4Addr_t answer) {
+        bit<16>   temp16;
+        ip4Addr_t temp32;
+
+        temp32 = hdr.ipv4.srcAddr;
+        hdr.ipv4.srcAddr = hdr.ipv4.dstAddr;
+        hdr.ipv4.dstAddr = temp32;
+        hdr.ipv4.totalLen = hdr.ipv4.totalLen + 16;
+
+        temp16 = hdr.udp.srcPort;
+        hdr.udp.srcPort = hdr.udp.dstPort;
+        hdr.udp.dstPort = temp16;
+        hdr.udp.totalLen = hdr.udp.totalLen + 16;
+
+        hdr.dns.qr = DNS_TYPE_RESPONSE;
+        hdr.dns.respCode = DNS_RESP_NOERROR;
+        hdr.dns.qdCount = 0;
+        hdr.dns.anCount = 1;
+
+        hdr.dns_anwser.name = hdr.dns_query.name;
+        hdr.dns_anwser.type = DNS_RR_ADDRESS;
+        hdr.dns_anwser.class = DNS_CLASS_INTERNET;
+        hdr.dns_anwser.ttl = 64;
+        hdr.dns_anwser.rdLength = 4;
+        hdr.dns_anwser.rdData = answer;
+        hdr.dns_anwser.setValid();
+    }
+
+    action dns_miss() {
+        hdr.dns.respCode = DNS_RESP_NAMEERROR;
+    }
+
+    action ipv4_forward(macAddr_t dstAddr, port_t port) {
+        standard_metadata.egress_spec = port;
+        hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
+        hdr.ethernet.dstAddr = dstAddr;
+        hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
+    }
+
+    table ipv4_lpm {
+        key = {
+            hdr.ipv4.dstAddr: lpm;
+        }
+        actions = {
+            ipv4_forward;
+            drop;
+            NoAction;
+        }
+        size = 16;
+        default_action = drop();
+    }
+
+    table dns_table {
+        key = {
+            hdr.dns_query.name: exact;
+        }
+        actions = {
+            dns_found;
+            dns_miss;
+            NoAction;
+        }
+        size = 64;
+        default_action = dns_miss();
     }
 
     apply {
-        /* TODO: fix ingress control logic
-         *  - ipv4_lpm should be applied only when IPv4 header is valid
-         */
+        if (hdr.ipv4.isValid()) {
+            if (meta.is_dns == 1) {
+                if (meta.is_query == 1) {
+                    dns_table.apply();
+                }
+                else {
+                    if (hdr.dns_anwser.isValid())
+                        hdr.dns_anwser.ttl = hdr.dns_anwser.ttl - 1;
+                }
+            }
+            ipv4_lpm.apply();
+        }
     }
 }
 
@@ -160,7 +286,7 @@ control DnsIngress(inout headers hdr,
 *************************************************************************/
 
 control DnsEgress(inout headers hdr,
-                 inout metadata meta,
+                 inout metadata_t meta,
                  inout standard_metadata_t standard_metadata) {
     apply {
 
@@ -171,9 +297,35 @@ control DnsEgress(inout headers hdr,
 *************** C H E C K S U M     C O M P U T A T I O N ****************
 *************************************************************************/
 
-control DnsComputeChecksum(inout headers hdr, inout metadata meta) {
+control DnsComputeChecksum(inout headers hdr, inout metadata_t meta) {
     apply {
-
+        update_checksum(hdr.ipv4.isValid(), {
+                hdr.ipv4.version,
+                hdr.ipv4.ihl,
+                hdr.ipv4.diffserv,
+                hdr.ipv4.totalLen,
+                hdr.ipv4.identification,
+                hdr.ipv4.flags,
+                hdr.ipv4.fragOffset,
+                hdr.ipv4.ttl,
+                hdr.ipv4.protocol,
+                hdr.ipv4.srcAddr,
+                hdr.ipv4.dstAddr
+            },
+            hdr.ipv4.hdrChecksum,
+            HashAlgorithm.csum16);
+        update_checksum_with_payload(true, {
+                hdr.ipv4.srcAddr,
+                hdr.ipv4.dstAddr,
+                8w0,
+                hdr.ipv4.protocol,
+                hdr.udp.totalLen,
+                hdr.udp.srcPort,
+                hdr.udp.dstPort,
+                hdr.udp.totalLen
+            },
+            hdr.udp.checksum,
+            HashAlgorithm.csum16);
     }
 }
 
@@ -187,6 +339,8 @@ control DnsDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.ipv4);
         packet.emit(hdr.udp);
         packet.emit(hdr.dns);
+        packet.emit(hdr.dns_query);
+        packet.emit(hdr.dns_anwser);
     }
 }
 
