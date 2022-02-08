@@ -16,7 +16,7 @@
         },
         "action_name": "DnsIngress.ipv4_forward",
         "action_params": {
-          "dstAddr": "08:00:00:00:01:11",
+          "dstAddr": "08:00:00:00:01:00",
           "port": 1
         }
       },
@@ -27,7 +27,7 @@
         },
         "action_name": "DnsIngress.ipv4_forward",
         "action_params": {
-          "dstAddr": "08:00:00:00:02:22",
+          "dstAddr": "08:00:00:00:02:00",
           "port": 2
         }
       },
@@ -40,7 +40,7 @@
       {
         "table": "DnsIngress.dns_table",
         "match": {
-          "hdr.dns_query.name": 7165919125647749743
+          "hdr.dns_query.name": 1834475296165823934208
         },
         "action_name": "DnsIngress.dns_found",
         "action_params": {
@@ -50,7 +50,7 @@
       {
         "table": "DnsIngress.dns_table",
         "match": {
-          "hdr.dns_query.name": 7093015899811047279
+          "hdr.dns_query.name": 1815812070351628103424
         },
         "action_name": "DnsIngress.dns_found",
         "action_params": {

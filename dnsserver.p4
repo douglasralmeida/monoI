@@ -6,6 +6,7 @@ const bit<16> TYPE_IPV4 = 0x800;
 const bit<8> TYPE_UDP = 17;
 
 const bit<16> DNS_CLASS_INTERNET = 1;
+const bit<16> DNS_PORT = 53;
 
 const bit<4> DNS_RESP_NOERROR = 0;
 const bit<4> DNS_RESP_NAMEERROR = 3;
@@ -15,13 +16,15 @@ const bit<1> DNS_TYPE_RESPONSE = 1;
 
 const bit<16> DNS_RR_ADDRESS = 1;
 
+const bit<2> DNS_COMPRESSION = 3;
+
 /*************************************************************************
 ************************** H E A D E R S *********************************
 *************************************************************************/
-typedef bit<9>  port_t;
-typedef bit<64>  string_t;
-typedef bit<48> macAddr_t;
-typedef bit<32> ip4Addr_t;
+typedef bit<9>   port_t;
+typedef bit<72>  string_t;
+typedef bit<48>  macAddr_t;
+typedef bit<32>  ip4Addr_t;
 
 header ethernet_t {
     macAddr_t dstAddr;
@@ -78,10 +81,11 @@ header dnsquery_t {
 }
 
 header dnsanswer_t {
-    string_t  name;
+    bit<2>    compression;
+    bit<14>   offset;
     bit<16>   type;
     bit<16>   class;
-    bit<16>   ttl;
+    bit<32>   ttl;
     bit<16>   rdLength;
     ip4Addr_t rdData;
 }
@@ -174,6 +178,7 @@ parser DnsParser(packet_in packet,
     /* start parsing DNS answer */
     state parse_dnsanswer {
         /* extract DNS answer in DNS packet */
+        packet.extract(hdr.dns_query);
         packet.extract(hdr.dns_anwser);
         transition accept;
     }
@@ -201,8 +206,8 @@ control DnsIngress(inout headers hdr,
     }
 
     action dns_found(ip4Addr_t answer) {
-        bit<16>   temp16;
         ip4Addr_t temp32;
+        bit<16> temp16;
 
         temp32 = hdr.ipv4.srcAddr;
         hdr.ipv4.srcAddr = hdr.ipv4.dstAddr;
@@ -212,20 +217,23 @@ control DnsIngress(inout headers hdr,
         temp16 = hdr.udp.srcPort;
         hdr.udp.srcPort = hdr.udp.dstPort;
         hdr.udp.dstPort = temp16;
+        /*hdr.udp.dstPort = 53;*/
         hdr.udp.totalLen = hdr.udp.totalLen + 16;
 
         hdr.dns.qr = DNS_TYPE_RESPONSE;
         hdr.dns.respCode = DNS_RESP_NOERROR;
-        hdr.dns.qdCount = 0;
         hdr.dns.anCount = 1;
 
-        hdr.dns_anwser.name = hdr.dns_query.name;
+        hdr.dns_anwser.setValid();
+        hdr.dns_anwser.compression = DNS_COMPRESSION;
+        hdr.dns_anwser.offset = 12;
         hdr.dns_anwser.type = DNS_RR_ADDRESS;
         hdr.dns_anwser.class = DNS_CLASS_INTERNET;
         hdr.dns_anwser.ttl = 64;
         hdr.dns_anwser.rdLength = 4;
         hdr.dns_anwser.rdData = answer;
-        hdr.dns_anwser.setValid();
+
+        /*standard_metadata.egress_spec = DNS_PORT;*/
     }
 
     action dns_miss() {
@@ -313,18 +321,6 @@ control DnsComputeChecksum(inout headers hdr, inout metadata_t meta) {
                 hdr.ipv4.dstAddr
             },
             hdr.ipv4.hdrChecksum,
-            HashAlgorithm.csum16);
-        update_checksum_with_payload(true, {
-                hdr.ipv4.srcAddr,
-                hdr.ipv4.dstAddr,
-                8w0,
-                hdr.ipv4.protocol,
-                hdr.udp.totalLen,
-                hdr.udp.srcPort,
-                hdr.udp.dstPort,
-                hdr.udp.totalLen
-            },
-            hdr.udp.checksum,
             HashAlgorithm.csum16);
     }
 }
