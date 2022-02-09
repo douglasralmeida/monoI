@@ -219,6 +219,7 @@ control DnsIngress(inout headers hdr,
         hdr.udp.dstPort = temp16;
         /*hdr.udp.dstPort = 53;*/
         hdr.udp.totalLen = hdr.udp.totalLen + 16;
+        hdr.udp.checksum = 0;
 
         hdr.dns.qr = DNS_TYPE_RESPONSE;
         hdr.dns.respCode = DNS_RESP_NOERROR;
