@@ -161,6 +161,7 @@ parser DnsParser(packet_in packet,
         packet.extract(hdr.dns);
         meta.is_dns = 1;
         transition select(hdr.dns.qr) {
+            /* parse DNS question or response */
             DNS_TYPE_QUERY: parse_dnsquery;
             DNS_TYPE_RESPONSE: parse_dnsanswer;
             default: accept;
@@ -217,7 +218,6 @@ control DnsIngress(inout headers hdr,
         temp16 = hdr.udp.srcPort;
         hdr.udp.srcPort = hdr.udp.dstPort;
         hdr.udp.dstPort = temp16;
-        /*hdr.udp.dstPort = 53;*/
         hdr.udp.totalLen = hdr.udp.totalLen + 16;
         hdr.udp.checksum = 0;
 
@@ -233,8 +233,6 @@ control DnsIngress(inout headers hdr,
         hdr.dns_anwser.ttl = 64;
         hdr.dns_anwser.rdLength = 4;
         hdr.dns_anwser.rdData = answer;
-
-        /*standard_metadata.egress_spec = DNS_PORT;*/
     }
 
     action dns_miss() {
