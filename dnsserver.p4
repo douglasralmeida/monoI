@@ -74,10 +74,10 @@ header dns_t {
 /* operations for varbit type                        */
 /* Query name must have exactly 8 letters            */
 header dnsquery_t {
-    bit<8> totalLen;
+    bit<8>   totalLen;
     string_t name;
-    bit<16> type;
-    bit<16> class;
+    bit<16>  type;
+    bit<16>  class;
 }
 
 header dnsanswer_t {
