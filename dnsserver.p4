@@ -101,7 +101,7 @@ struct headers {
     udp_t          udp;
     dns_t          dns;
     dnsquery_t     dns_query;
-    dnsanswer_t    dns_anwser;
+    dnsanswer_t    dns_answer;
 }
 
 /*************************************************************************
@@ -180,7 +180,7 @@ parser DnsParser(packet_in packet,
     state parse_dnsanswer {
         /* extract DNS answer in DNS packet */
         packet.extract(hdr.dns_query);
-        packet.extract(hdr.dns_anwser);
+        packet.extract(hdr.dns_answer);
         transition accept;
     }
 }
@@ -225,14 +225,14 @@ control DnsIngress(inout headers hdr,
         hdr.dns.respCode = DNS_RESP_NOERROR;
         hdr.dns.anCount = 1;
 
-        hdr.dns_anwser.setValid();
-        hdr.dns_anwser.compression = DNS_COMPRESSION;
-        hdr.dns_anwser.offset = 12;
-        hdr.dns_anwser.type = DNS_RR_ADDRESS;
-        hdr.dns_anwser.class = DNS_CLASS_INTERNET;
-        hdr.dns_anwser.ttl = 64;
-        hdr.dns_anwser.rdLength = 4;
-        hdr.dns_anwser.rdData = answer;
+        hdr.dns_answer.setValid();
+        hdr.dns_answer.compression = DNS_COMPRESSION;
+        hdr.dns_answer.offset = 12;
+        hdr.dns_answer.type = DNS_RR_ADDRESS;
+        hdr.dns_answer.class = DNS_CLASS_INTERNET;
+        hdr.dns_answer.ttl = 64;
+        hdr.dns_answer.rdLength = 4;
+        hdr.dns_answer.rdData = answer;
     }
 
     action dns_miss() {
@@ -240,10 +240,10 @@ control DnsIngress(inout headers hdr,
     }
 
     action ipv4_forward(macAddr_t dstAddr, port_t port) {
+        hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
         standard_metadata.egress_spec = port;
         hdr.ethernet.srcAddr = hdr.ethernet.dstAddr;
         hdr.ethernet.dstAddr = dstAddr;
-        hdr.ipv4.ttl = hdr.ipv4.ttl - 1;
     }
 
     table ipv4_lpm {
@@ -274,13 +274,19 @@ control DnsIngress(inout headers hdr,
 
     apply {
         if (hdr.ipv4.isValid()) {
+            if (hdr.ipv4.ttl == 0) {
+                drop();
+                exit;
+            }
+        
             if (meta.is_dns == 1) {
                 if (meta.is_query == 1) {
                     dns_table.apply();
                 }
                 else {
-                    if (hdr.dns_anwser.isValid())
-                        hdr.dns_anwser.ttl = hdr.dns_anwser.ttl - 1;
+                    if (hdr.dns_answer.isValid())
+                        if (hdr.dns_answer.ttl > 0)
+                            hdr.dns_answer.ttl = hdr.dns_answer.ttl - 1;
                 }
             }
             ipv4_lpm.apply();
@@ -335,7 +341,7 @@ control DnsDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.udp);
         packet.emit(hdr.dns);
         packet.emit(hdr.dns_query);
-        packet.emit(hdr.dns_anwser);
+        packet.emit(hdr.dns_answer);
     }
 }
 
