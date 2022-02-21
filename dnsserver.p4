@@ -236,7 +236,7 @@ control DnsIngress(inout headers hdr,
     }
 
     action dns_miss() {
-        hdr.dns.respCode = DNS_RESP_NAMEERROR;
+        /* nothing to do, just to forward message*/
     }
 
     action ipv4_forward(macAddr_t dstAddr, port_t port) {
