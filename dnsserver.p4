@@ -2,6 +2,8 @@
 #include <core.p4>
 #include <v1model.p4>
 
+#define MAX_DNSNAMELENGTH 63
+
 const bit<16> TYPE_IPV4 = 0x800;
 const bit<8> TYPE_UDP = 17;
 
@@ -21,10 +23,10 @@ const bit<2> DNS_COMPRESSION = 3;
 /*************************************************************************
 ************************** H E A D E R S *********************************
 *************************************************************************/
-typedef bit<9>   port_t;
-typedef bit<72>  string_t;
-typedef bit<48>  macAddr_t;
-typedef bit<32>  ip4Addr_t;
+typedef bit<9>    port_t;
+typedef bit<512>  string_t;
+typedef bit<48>   macAddr_t;
+typedef bit<32>   ip4Addr_t;
 
 header ethernet_t {
     macAddr_t dstAddr;
@@ -70,12 +72,17 @@ header dns_t {
     bit<16> arCount;
 }
 
-/* Use fixed size for query name until P4 to support */
-/* operations for varbit type                        */
-/* Query name must have exactly 8 letters            */
-header dnsquery_t {
+header dns_querylen_t {
     bit<8>   totalLen;
-    string_t name;
+}
+
+/*
+    Include dns query text header for
+    all text size possibilites
+*/
+#include "inc/declaration.p4"
+
+header dnsqueryopt_t {
     bit<16>  type;
     bit<16>  class;
 }
@@ -93,15 +100,18 @@ header dnsanswer_t {
 struct metadata_t {
     bit<1> is_dns;
     bit<1> is_query;
+    bit<8> querylen;
 }
 
 struct headers {
-    ethernet_t     ethernet;
-    ipv4_t         ipv4;
-    udp_t          udp;
-    dns_t          dns;
-    dnsquery_t     dns_query;
-    dnsanswer_t    dns_answer;
+    ethernet_t                ethernet;
+    ipv4_t                    ipv4;
+    udp_t                     udp;
+    dns_t                     dns;
+    dns_querylen_t            dns_querylen;
+    dnstext_t                 dns_querytext;
+    dnsqueryopt_t             dns_queryopt;
+    dnsanswer_t               dns_answer;
 }
 
 /*************************************************************************
@@ -113,10 +123,14 @@ parser DnsParser(packet_in packet,
                 inout metadata_t meta,
                 inout standard_metadata_t standard_metadata) {
 
+    bit<1> aa;
+    bit<2> ab;
+
     /* start parsing */
     state start {
         meta.is_dns = 0;
         meta.is_query = 0;
+        meta.querylen = 0;
 
         /* parse ethernet packet */
         transition parse_ethernet;
@@ -168,11 +182,15 @@ parser DnsParser(packet_in packet,
         }
     }
 
-    /* start parsing DNS query */
-    state parse_dnsquery {
-        /* extract DNS query in DNS packet */
-        packet.extract(hdr.dns_query);
+    /* start parsing DNS query text */
+    #include "inc/parsing.p4"
+
+    /* start parsing DNS query options */
+    state parse_dnsqueryoptions {
+        /* extract DNS query options in DNS packet */
+        packet.extract(hdr.dns_queryopt);
         meta.is_query = 1;
+
         transition accept;
     }
 
@@ -259,18 +277,7 @@ control DnsIngress(inout headers hdr,
         default_action = drop();
     }
 
-    table dns_table {
-        key = {
-            hdr.dns_query.name: exact;
-        }
-        actions = {
-            dns_found;
-            dns_miss;
-            NoAction;
-        }
-        size = 64;
-        default_action = dns_miss();
-    }
+    #include "inc/tables.p4"
 
     apply {
         if (hdr.ipv4.isValid()) {
@@ -278,10 +285,12 @@ control DnsIngress(inout headers hdr,
                 drop();
                 exit;
             }
-        
+
             if (meta.is_dns == 1) {
                 if (meta.is_query == 1) {
-                    dns_table.apply();
+
+                #include "inc/apply.p4"
+
                 }
                 else {
                     if (hdr.dns_answer.isValid())
@@ -340,7 +349,9 @@ control DnsDeparser(packet_out packet, in headers hdr) {
         packet.emit(hdr.ipv4);
         packet.emit(hdr.udp);
         packet.emit(hdr.dns);
-        packet.emit(hdr.dns_query);
+        packet.emit(hdr.dns_querylen);
+        packet.emit(hdr.dns_querytext);
+        packet.emit(hdr.dns_queryopt);
         packet.emit(hdr.dns_answer);
     }
 }

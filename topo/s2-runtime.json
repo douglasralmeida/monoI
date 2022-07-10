@@ -43,15 +43,73 @@
         }
       },
       {
-        "table": "DnsIngress.dns_table",
+        "table": "DnsIngress.dns_table1",
         "default_action": true,
         "action_name": "DnsIngress.dns_miss",
         "action_params": { }
       },
       {
-        "table": "DnsIngress.dns_table",
+        "table": "DnsIngress.dns_table1",
         "match": {
-          "hdr.dns_query.name": 1797723366906369634048
+          "hdr.dns_querytext.query1.text": 25600
+        },
+        "action_name": "DnsIngress.dns_found",
+        "action_params": {
+          "answer": "10.0.2.2"
+        }
+      },
+      {
+        "table": "DnsIngress.dns_table2",
+        "default_action": true,
+        "action_name": "DnsIngress.dns_miss",
+        "action_params": { }
+      },
+      {
+        "table": "DnsIngress.dns_table2",
+        "match": {
+          "hdr.dns_querytext.query2.text": 7171584
+        },
+        "action_name": "DnsIngress.dns_found",
+        "action_params": {
+          "answer": "10.0.2.2"
+        }
+      },
+      {
+        "table": "DnsIngress.dns_table3",
+        "default_action": true,
+        "action_name": "DnsIngress.dns_miss",
+        "action_params": { }
+      },
+      {
+        "table": "DnsIngress.dns_table3",
+        "match": {
+          "hdr.dns_querytext.query3.text": 2021227008
+        },
+        "action_name": "DnsIngress.dns_found",
+        "action_params": {
+          "answer": "10.0.2.2"
+        }
+      },
+      {
+        "table": "DnsIngress.dns_table4",
+        "default_action": true,
+        "action_name": "DnsIngress.dns_miss",
+        "action_params": { }
+      },
+      {
+        "table": "DnsIngress.dns_table4",
+        "match": {
+          "hdr.dns_querytext.query4.text": 418262508544
+        },
+        "action_name": "DnsIngress.dns_found",
+        "action_params": {
+          "answer": "10.0.2.2"
+        }
+      },
+      {
+        "table": "DnsIngress.dns_table4",
+        "match": {
+          "hdr.dns_querytext.query4.text": 422540632320
         },
         "action_name": "DnsIngress.dns_found",
         "action_params": {
@@ -59,9 +117,15 @@
         }
       },
       {
-        "table": "DnsIngress.dns_table",
+        "table": "DnsIngress.dns_table8",
+        "default_action": true,
+        "action_name": "DnsIngress.dns_miss",
+        "action_params": { }
+      },
+      {
+        "table": "DnsIngress.dns_table8",
         "match": {
-          "hdr.dns_query.name": 1889377539029622812416
+          "hdr.dns_querytext.query8.text": 1889377539029622812416
         },
         "action_name": "DnsIngress.dns_found",
         "action_params": {
