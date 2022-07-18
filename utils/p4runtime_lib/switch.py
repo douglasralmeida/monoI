@@ -145,6 +145,15 @@ class SwitchConnection(object):
         else:
             self.client_stub.Write(request)
 
+    def PacketIn(self, dry_run=False, **kwargs):
+        request = p4runtime_pb2.StreamMessageRequest()
+        if dry_run:
+            print("P4Runtime PacketIn: ", request)
+        else:
+            self.requests_stream.put(request)
+            for item in self.stream_msg_resp:
+                return item
+
 class GrpcRequestLogger(grpc.UnaryUnaryClientInterceptor,
                         grpc.UnaryStreamClientInterceptor):
     """Implementation of a gRPC interceptor that logs request to a file"""
