@@ -197,8 +197,9 @@ parser DnsParser(packet_in packet,
     /* start parsing DNS answer */
     state parse_dnsanswer {
         /* extract DNS answer in DNS packet */
-        packet.extract(hdr.dns_query);
-        packet.extract(hdr.dns_answer);
+        //packet.extract(hdr.dns_querylen);
+        //packet.extract(hdr.dns_queryopt);
+        //packet.extract(hdr.dns_answer);
         transition accept;
     }
 }
